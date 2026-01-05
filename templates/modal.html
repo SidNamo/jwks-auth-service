@@ -1,0 +1,134 @@
+<!-- ✅ 공통 반투명 배경 -->
+<div id="modal-backdrop" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99]">
+</div>
+
+<!-- ✅ 알림/확인 모달 -->
+<div id="custom-modal" class="modal-layer hidden fixed inset-0 flex items-center justify-center z-[200]">
+    <div id="modal-content" class="bg-white rounded-lg shadow-lg max-w-sm w-full p-6 text-center relative">
+        <h2 id="modal-title" class="text-xl font-semibold mb-4">알림</h2>
+        <p id="modal-message" class="text-gray-700 mb-6 whitespace-pre-line"></p>
+        <div id="modal-buttons" class="flex justify-center space-x-4"></div>
+    </div>
+</div>
+
+<!-- ✅ 중앙 흰 박스 로딩 -->
+<div id="loading-overlay" class="modal-layer hidden fixed inset-0 flex items-center justify-center z-[300]">
+    <div class="bg-white rounded-xl shadow-xl p-8 flex flex-col items-center justify-center space-y-4">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-indigo-600"></div>
+        <p class="text-gray-700 text-lg font-semibold">로딩 중...</p>
+    </div>
+</div>
+
+<script>
+    if (typeof window.__modal_initialized === "undefined") {
+        window.__modal_initialized = true;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const backdrop = document.getElementById("modal-backdrop");
+            const modalLayers = document.querySelectorAll(".modal-layer");
+
+            if (!backdrop) return;
+
+            // ✅ z-index 우선순위에 따른 정렬
+            const getZIndex = (el) => {
+                const z = window.getComputedStyle(el).zIndex;
+                return parseInt(z) || 0;
+            };
+
+            const updateBackdropZ = () => {
+                const openLayers = Array.from(modalLayers).filter(el => !el.classList.contains("hidden"));
+                if (openLayers.length === 0) {
+                    backdrop.classList.add("hidden");
+                    return;
+                }
+
+                // 가장 높은 z-index 찾기
+                const topZ = Math.max(...openLayers.map(getZIndex));
+                backdrop.classList.remove("hidden");
+
+                // 배경은 항상 해당 z보다 1 낮게 유지
+                const newZ = topZ - 1;
+                backdrop.style.zIndex = newZ;
+            };
+
+            // MutationObserver로 동적 감지
+            const observer = new MutationObserver(updateBackdropZ);
+            modalLayers.forEach(el => {
+                observer.observe(el, { attributes: true, attributeFilter: ["class"] });
+            });
+
+            // 초기 상태 동기화
+            updateBackdropZ();
+
+            // ────────────────────────────────
+            // ✅ 로딩 제어 함수
+            // ────────────────────────────────
+            window.showLoading = function (message = "로딩 중...") {
+                const overlay = document.getElementById("loading-overlay");
+                overlay.querySelector("p").textContent = message;
+                overlay.classList.remove("hidden");
+                updateBackdropZ();
+            };
+
+            window.hideLoading = function () {
+                const overlay = document.getElementById("loading-overlay");
+                overlay.classList.add("hidden");
+                updateBackdropZ();
+            };
+
+            // ────────────────────────────────
+            // ✅ alert / confirm
+            // ────────────────────────────────
+            const modal = document.getElementById("custom-modal");
+            const modalTitle = document.getElementById("modal-title");
+            const modalMsg = document.getElementById("modal-message");
+            const modalButtons = document.getElementById("modal-buttons");
+
+            window.alert = function (message) {
+                return new Promise((resolve) => {
+                    modalTitle.textContent = "알림";
+                    modalMsg.textContent = message.replace(/<br\s*\/?>/gi, "\n");
+                    modalButtons.innerHTML = `
+                    <button id="alert-ok" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition">
+                        확인
+                    </button>`;
+                    document.getElementById("alert-ok").onclick = () => {
+                        modal.classList.add("hidden");
+                        updateBackdropZ();
+                        resolve();
+                    };
+                    modal.classList.remove("hidden");
+                    updateBackdropZ();
+                });
+            };
+
+            window.confirm = function (message) {
+                return new Promise((resolve) => {
+                    modalTitle.textContent = "확인";
+                    modalMsg.textContent = message.replace(/<br\s*\/?>/gi, "\n");
+                    modalButtons.innerHTML = `
+                    <button id="confirm-yes" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition">
+                        확인
+                    </button>
+                    <button id="confirm-no" class="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400 transition">
+                        취소
+                    </button>`;
+
+                    document.getElementById("confirm-yes").onclick = () => {
+                        modal.classList.add("hidden");
+                        updateBackdropZ();
+                        resolve(true);
+                    };
+                    document.getElementById("confirm-no").onclick = () => {
+                        modal.classList.add("hidden");
+                        updateBackdropZ();
+                        resolve(false);
+                    };
+
+                    modal.classList.remove("hidden");
+                    updateBackdropZ();
+                });
+            };
+        });
+    }
+</script>

@@ -1,0 +1,563 @@
+<div class="bg-white shadow-md rounded-2xl p-6 relative">
+
+    <!-- ✅ 상단 -->
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">사용자 관리</h2>
+    </div>
+
+    <!-- 🔍 통합 검색 + 상세 검색 -->
+    <div class="mb-4">
+        <form id="search_form" method="get" action="{{ request.base_url }}admin/users"
+            class="flex flex-col items-end text-sm gap-3">
+
+            <!-- 1) 통합 검색 행 -->
+            <div class="flex items-center justify-between gap-2 relative w-full">
+                <!-- 왼쪽: 사용자 추가 버튼 -->
+                <button type="button"
+                    class="bg-gray-200 text-gray-800 px-3 py-2 rounded text-sm hover:bg-gray-300 border border-gray-300"
+                    onclick="openUserAddModal()">
+                    사용자 추가
+                </button>
+
+                <!-- 오른쪽: 검색창 + 버튼 -->
+                <div class="flex items-center gap-2">
+                    <input type="text" id="search_input" name="query" placeholder="이름, ID, UID 검색..."
+                        value="{{ page.search.query or '' }}"
+                        class="border border-gray-300 rounded-lg px-3 py-2 w-80 focus:ring focus:ring-indigo-200"
+                        onfocus="openDetailSearch()">
+
+                    <button type="button" class="bg-indigo-600 text-white px-4 py-2 rounded" onclick="doSearch(1)">
+                        검색
+                    </button>
+                </div>
+
+                <!-- 📦 상세 검색 패널 (절대 위치) -->
+                <div id="detail_search_panel"
+                    class="absolute top-12 right-0 w-[32rem] bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 scale-y-0 origin-top transition-all duration-300 ease-out hidden z-40">
+                    <div class="p-5 relative">
+                        <button type="button" onclick="resetDetailSearch()"
+                            class="absolute right-4 top-4 text-sm bg-red-500 hover:bg-red-600 text-white rounded px-3 py-1 shadow-sm transition">
+                            초기화
+                        </button>
+
+                        <h3 class="text-sm font-semibold mb-4 text-gray-700">상세 검색</h3>
+
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <label class="block mb-1 text-gray-600">UID</label>
+                                <input type="text" name="uid" value="{{ page.search.uid or '' }}"
+                                    class="border rounded px-2 py-1 w-full">
+                            </div>
+                            <div>
+                                <label class="block mb-1 text-gray-600">ID</label>
+                                <input type="text" name="id" value="{{ page.search.id or '' }}"
+                                    class="border rounded px-2 py-1 w-full">
+                            </div>
+                            <div>
+                                <label class="block mb-1 text-gray-600">이름</label>
+                                <input type="text" name="name" value="{{ page.search.name or '' }}"
+                                    class="border rounded px-2 py-1 w-full">
+                            </div>
+                            <div>
+                                <label class="block mb-1 text-gray-600">상태</label>
+                                <select name="status" class="border rounded px-2 py-2 w-full">
+                                    <option value="">전체 상태</option>
+                                    <option value="USE" {% if page.search.status=='USE' %}selected{% endif %}>사용
+                                    </option>
+                                    <option value="WAIT" {% if page.search.status=='WAIT' %}selected{% endif %}>대기
+                                    </option>
+                                    <option value="DEL" {% if page.search.status=='DEL' %}selected{% endif %}>탈퇴
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block mb-1 text-gray-600">가입일</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="date" name="created_dt_start"
+                                        value="{{ page.search.created_dt_start or '' }}"
+                                        class="border rounded px-2 py-1 w-full">
+                                    <span>~</span>
+                                    <input type="date" name="created_dt_end"
+                                        value="{{ page.search.created_dt_end or '' }}"
+                                        class="border rounded px-2 py-1 w-full">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- ✅ 사용자 테이블 -->
+            <table class="w-full border-collapse text-sm">
+                <thead>
+                    <tr class="bg-gray-100 border-b">
+                        <th class="p-2 text-left">UID</th>
+                        <th class="p-2 text-left">ID</th>
+                        <th class="p-2 text-left">이름</th>
+                        <th class="p-2 text-center">상태</th>
+                        <th class="p-2 text-left">가입일</th>
+                        <th class="p-2 text-left">변경일</th>
+                        <th class="p-2 text-center">관리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if page.content %}
+                    {% for u in page.content %}
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="p-2">{{ u.uid }}</td>
+                        <td class="p-2">{{ u.id }}</td>
+                        <td class="p-2">{{ u.name }}</td>
+                        <td class="p-2 text-center">
+                            {% if u.status == 'USE' %}
+                            <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">사용</span>
+                            {% elif u.status == 'WAIT' %}
+                            <span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs">대기</span>
+                            {% else %}
+                            <span class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">탈퇴</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-2">{{ u.created_at.strftime('%Y-%m-%d %H:%M:%S') if u.created_at else '' }}</td>
+                        <td class="p-2">{{ u.updated_at.strftime('%Y-%m-%d %H:%M:%S') if u.updated_at else '' }}</td>
+                        <td class="p-2 text-center space-x-2">
+                            <button type="button" class="text-indigo-600 hover:underline"
+                                onclick="openUserModal({{ u.uid }})">관리</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-gray-500 py-6">
+                            등록된 사용자가 없습니다.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+
+            <!-- ✅ 페이지네이션 + 표시 개수 -->
+            <div class="w-full mt-6 text-sm flex items-center justify-center relative py-2">
+
+                <!-- ◀️ 페이징 (가운데 정렬) -->
+                <div class="flex justify-center items-center space-x-1">
+                    <button onclick="doPaging(1)" class="px-3 py-1 border rounded 
+                        {% if page.page == 1 %}opacity-50 cursor-not-allowed{% else %}hover:bg-gray-100{% endif %}" {%
+                        if page.page==1 %}disabled{% endif %}>
+                        &laquo;
+                    </button>
+
+                    <button onclick="doPaging({{ page.start_page - page.page_size }})" class="px-3 py-1 border rounded 
+                        {% if not page.has_prev %}opacity-50 cursor-not-allowed{% else %}hover:bg-gray-100{% endif %}"
+                        {% if not page.has_prev %}disabled{% endif %}>
+                        &lsaquo;
+                    </button>
+
+                    {% for p in range(page.start_page, page.end_page + 1) %}
+                    <button onclick="doPaging({{ p }})" class="px-3 py-1 border rounded 
+                        {% if p == page.page %}bg-indigo-600 text-white{% else %}hover:bg-gray-100{% endif %}">
+                        {{ p }}
+                    </button>
+                    {% endfor %}
+
+                    <button onclick="doPaging({{ page.start_page + page.page_size }})" class="px-3 py-1 border rounded 
+                        {% if not page.has_next %}opacity-50 cursor-not-allowed{% else %}hover:bg-gray-100{% endif %}"
+                        {% if not page.has_next %}disabled{% endif %}>
+                        &rsaquo;
+                    </button>
+
+                    <button onclick="doPaging({{ page.page_total }})"
+                        class="px-3 py-1 border rounded 
+                        {% if page.page == page.page_total %}opacity-50 cursor-not-allowed{% else %}hover:bg-gray-100{% endif %}" {% if page.page==page.page_total
+                        %}disabled{% endif %}>
+                        &raquo;
+                    </button>
+                </div>
+
+                <!-- ▶️ 표시 개수 (같은 flex 라인 오른쪽 끝으로 자동 정렬) -->
+                <div class="flex items-center gap-2 text-gray-700 absolute right-6">
+                    <label>표시:</label>
+                    <select name="list_size"
+                        class="border rounded px-2 py-1 focus:ring focus:ring-indigo-200 focus:border-indigo-400"
+                        onchange="doSearch(1)">
+                        {% for size in [10, 25, 50, 100] %}
+                        <option value="{{ size }}" {% if size==page.list_size %}selected{% endif %}>{{ size }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="text-gray-500">개</span>
+                </div>
+            </div>
+
+
+            <!-- 유지용 히든 -->
+            <input type="hidden" id="page" name="page" value="{{ page.page }}">
+            <input type="hidden" name="page_size" value="{{ page.page_size }}">
+
+        </form>
+    </div>
+
+    <p class="text-xs text-gray-500 text-center mt-2">
+        총 {{ page.list_total }}명 / {{ page.page_total }}페이지
+    </p>
+</div>
+
+
+<!-- 🪄 사용자 수정 모달 -->
+<div id="user_modal" class="modal-layer hidden fixed inset-0 flex items-center justify-center z-[100]">
+    <div class="bg-gray-50 rounded-xl shadow-xl w-[32rem] max-h-[90vh] flex flex-col relative overflow-hidden">
+
+        <!-- ✅ 상단 헤더 -->
+        <div class="flex justify-between items-center p-6 border-b bg-gray-50 rounded-t-xl">
+            <h3 class="text-lg font-bold text-gray-800">사용자 정보 수정</h3>
+            <button onclick="closeUserAddModal()"
+                class="text-gray-closeUserModal hover:text-gray-700 text-xl leading-none">✕</button>
+        </div>
+        <!-- ✅ 스크롤 가능한 본문 -->
+        <div class="p-6 overflow-y-auto flex-1 bg-white">
+            <form method="post" action="{{ request.base_url }}admin/users" class="space-y-3 text-sm">
+                <div class="space-y-3 text-sm">
+                    <div>
+                        <label class="block mb-1 text-gray-600">이름</label>
+                        <input name="name" type="text"
+                            class="border rounded px-2 py-1 w-full focus:ring focus:ring-indigo-200">
+                    </div>
+                    <div>
+                        <label class="block mb-1 text-gray-600">아이디</label>
+                        <input name="id" type="text"
+                            class="border rounded px-2 py-1 w-full focus:ring focus:ring-indigo-200">
+                    </div>
+                    <div>
+                        <label class="block mb-1 text-gray-600">비밀번호</label>
+                        <input name="password" type="password"
+                            class="border rounded px-2 py-1 w-full focus:ring focus:ring-indigo-200"
+                            placeholder="변경 시에만 입력">
+                    </div>
+                    <div>
+                        <label class="block mb-1 text-gray-600">상태</label>
+                        <select name="status" class="border rounded px-2 py-1 w-full">
+                            <option value="USE">사용</option>
+                            <option value="WAIT">대기</option>
+                            <option value="DEL">탈퇴</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block mb-1 text-gray-600">권한</label>
+                        <div class="border rounded-lg p-2 bg-gray-50 max-h-48 overflow-y-auto text-sm">
+                            <table class="w-full border-collapse text-sm">
+                                <thead class="sticky top-0 bg-gray-100 z-10">
+                                    <tr class="border-b">
+                                        <th class="p-2 w-12 text-center"><input type="checkbox" class="select-all"></th>
+                                        <th class="p-2 text-left text-gray-700 font-medium">권한명</th>
+                                        <th class="p-2 text-left text-gray-700 font-medium">설명</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for r in roles %}
+                                    <tr class="border-b hover:bg-gray-100">
+                                        <td class="p-2 text-center">
+                                            <input type="checkbox" name="roles" value="{{ r.uid }}"
+                                                class="role-checkbox cursor-pointer">
+                                        </td>
+                                        <td class="p-2 font-medium text-gray-800">{{ r.name }}</td>
+                                        <td class="p-2 text-gray-600 text-xs truncate max-w-[14rem]"
+                                            title="{{ r.description }}">
+                                            {{ r.description or '' }}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <!-- ✅ 하단 버튼 -->
+        <div class="border-t bg-gray-50 p-4 flex justify-center gap-3 rounded-b-xl">
+            <button type="button" onclick="closeUserModal()"
+                class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">취소</button>
+            <button type="button" onclick="saveUserModal()"
+                class="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white">저장</button>
+        </div>
+    </div>
+</div>
+
+<!-- 🧩 사용자 추가 모달 -->
+<div id="user_add_modal" class="modal-layer hidden fixed inset-0 flex items-center justify-center z-[100]">
+    <div class="bg-gray-50 rounded-xl shadow-xl w-[32rem] max-h-[90vh] flex flex-col relative overflow-hidden">
+
+        <!-- ✅ 상단 헤더 -->
+        <div class="flex justify-between items-center p-6 border-b bg-gray-50 rounded-t-xl">
+            <h3 class="text-lg font-bold text-gray-800">사용자 추가</h3>
+            <button onclick="closeUserAddModal()" class="text-gray-500 hover:text-gray-700 text-xl leading-none">✕</button>
+        </div>
+        <!-- ✅ 스크롤 가능한 본문 -->
+        <div class="p-6 overflow-y-auto flex-1 bg-white">
+            <form  method="post" action="{{ request.base_url }}admin/users" class="space-y-3 text-sm" >
+                <div class="space-y-3 text-sm">
+                    <div>
+                        <label class="block mb-1 text-gray-600">이름</label>
+                        <input name="name" type="text"
+                            class="border rounded px-2 py-1 w-full focus:ring focus:ring-indigo-200">
+                    </div>
+                    <div>
+                        <label class="block mb-1 text-gray-600">아이디</label>
+                        <input name="id" type="text"
+                            class="border rounded px-2 py-1 w-full focus:ring focus:ring-indigo-200">
+                    </div>
+                    <div>
+                        <label class="block mb-1 text-gray-600">비밀번호</label>
+                        <input name="password" type="password"
+                            class="border rounded px-2 py-1 w-full focus:ring focus:ring-indigo-200" placeholder="필수 입력">
+                    </div>
+                    <div>
+                        <label class="block mb-1 text-gray-600">상태</label>
+                        <select name="status" class="border rounded px-2 py-1 w-full">
+                            <option value="WAIT">대기</option>
+                            <option value="USE">사용</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block mb-1 text-gray-600">권한</label>
+                        <div class="border rounded-lg bg-gray-50 max-h-48 overflow-y-auto text-sm">
+                            <table class="w-full border-collapse text-sm">
+                                <thead class="sticky top-0 bg-gray-100 z-10">
+                                    <tr class="border-b">
+                                        <th class="p-2 w-12 text-center"><input type="checkbox" class="select-all"></th>
+                                        <th class="p-2 text-left text-gray-700 font-medium">권한명</th>
+                                        <th class="p-2 text-left text-gray-700 font-medium">설명</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for r in roles %}
+                                    <tr class="border-b hover:bg-gray-100">
+                                        <td class="p-2 text-center">
+                                            <input type="checkbox" name="roles" value="{{ r.uid }}"
+                                                class="add-role-checkbox cursor-pointer">
+                                        </td>
+                                        <td class="p-2 font-medium text-gray-800">{{ r.name }}</td>
+                                        <td class="p-2 text-gray-600 text-xs truncate max-w-[14rem]"
+                                            title="{{ r.description }}">
+                                            {{ r.description or '' }}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <!-- ✅ 하단 버튼 -->
+        <div class="border-t bg-gray-50 p-4 flex justify-center gap-3 rounded-b-xl">
+            <button type="button" onclick="closeUserAddModal()"
+                class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">취소</button>
+            <button type="button" onclick="saveUserAddModal()"
+                class="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white">저장</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ✅ 전체 선택 / 해제 기능
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll(".select-all").forEach(headerCheck => {
+            headerCheck.addEventListener("change", () => {
+                const table = headerCheck.closest("table");
+                table.querySelectorAll("tbody input[type='checkbox']").forEach(cb => cb.checked = headerCheck.checked);
+            });
+        });
+    });
+    
+    function doSearch(page = 1) {
+        const form = document.querySelector("#search_form");
+        const params = new URLSearchParams();
+        form.querySelector("#page").value = page;
+        form.querySelectorAll("input, select, textarea").forEach(el => {
+            const name = el.name;
+            if (!name) return;
+            const value = (el.value || "").trim();
+
+            // 값이 없거나 빈 문자열이면 제외
+            if (value === "" || value === null || value === undefined) return;
+
+            if (el.type === "checkbox") {
+                if (el.checked) params.append(name, el.value || "true");
+            } else if (el.type === "radio") {
+                if (el.checked) params.append(name, value);
+            } else {
+                if (value !== "") params.append(name, value);
+            }
+        });
+        location.href = form.action + "?" + params.toString();
+    }
+
+    function doPaging(pageNum) {
+        if (pageNum < 1) pageNum = 1;
+        doSearch(pageNum);
+    }
+
+    const panel = document.getElementById("detail_search_panel");
+    const input = document.getElementById("search_input");
+
+    function openDetailSearch() {
+        panel.classList.remove("hidden", "opacity-0", "scale-y-0");
+        setTimeout(() => panel.classList.add("opacity-100", "scale-y-100"), 10);
+    }
+
+    function closeDetailSearch() {
+        panel.classList.remove("opacity-100", "scale-y-100");
+        panel.classList.add("opacity-0", "scale-y-0");
+        setTimeout(() => panel.classList.add("hidden"), 200);
+    }
+
+    function resetDetailSearch() {
+        const form = document.querySelector("#search_form");
+        form.querySelectorAll("#detail_search_panel input, #detail_search_panel select").forEach(el => {
+            if (el.tagName === "SELECT") el.selectedIndex = 0;
+            else el.value = "";
+        });
+    }
+
+    document.addEventListener("click", (e) => {
+        const opened = !panel.classList.contains("hidden");
+        if (!opened) return;
+        if (!panel.contains(e.target) && e.target !== input) closeDetailSearch();
+    });
+
+
+    async function openUserModal(uid) {
+        showLoading();
+        const modal = document.getElementById("user_modal");
+        const form = modal.querySelector("form");
+
+        try {
+            const resp = await fetch(`{{ request.base_url }}admin/users/${uid}`);
+            if (!resp.ok) throw new Error("사용자 정보를 불러오지 못했습니다.");
+            const user = await resp.json();
+
+            form.querySelector('[name="id"]').value = user.id || "";
+            form.querySelector('[name="name"]').value = user.name || "";
+            form.querySelector('[name="status"]').value = user.status || "WAIT";
+            form.querySelector('[name="password"]').value = "";
+            form.querySelectorAll('.role-checkbox').forEach(cb => {
+                cb.checked = (user.roles || []).includes(parseInt(cb.value));
+            });
+
+            form.dataset.uid = uid;
+            form.dataset.orig = JSON.stringify({
+                name: user.name || "",
+                id: user.id || "",
+                status: user.status || "",
+                password: ""
+            });
+
+            modal.classList.remove("hidden");
+        } catch (err) {
+            alert(err.message);
+            closeUserModal();
+        } finally {
+            hideLoading();
+        }
+    }
+
+    function closeUserModal() {
+        const modal = document.getElementById("user_modal");
+        modal.classList.add("hidden");
+        modal.querySelector("form").reset();
+    }
+
+
+    // ✅ 수정된 필드만 PATCH 전송
+    async function saveUserModal() {
+        showLoading();
+
+        const form = document.querySelector("#user_modal form");
+        const uid = form.dataset.uid;
+        const orig = JSON.parse(form.dataset.orig);
+
+        const current = {
+            name: form.querySelector('[name="name"]').value.trim(),
+            id: form.querySelector('[name="id"]').value.trim(),
+            status: form.querySelector('[name="status"]').value,
+            password: form.querySelector('[name="password"]').value.trim(),
+            roles: Array.from(form.querySelectorAll('.role-checkbox:checked')).map(cb => parseInt(cb.value)),
+        };
+
+        // 변경된 필드만 추출
+        const updated = {};
+        for (const key in current) {
+            if (current[key] !== orig[key] && current[key] !== "") {
+                updated[key] = current[key];
+            }
+        }
+
+        if (Object.keys(updated).length === 0) {
+            alert("변경된 내용이 없습니다.");
+            return;
+        }
+
+        try {
+            const resp = await fetch(`{{ request.base_url }}admin/users/${uid}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(updated),
+            });
+
+            if (!resp.ok) {
+                const errData = await resp.json().catch(() => ({}));
+                const msg = errData.detail || errData.message || "수정 실패";
+                throw new Error(`❌ ${msg}`);
+            }
+
+            alert("✅ 사용자 정보가 수정되었습니다.");
+            closeUserModal();
+            location.reload();
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            hideLoading();
+        }
+    };
+
+    function openUserAddModal() {
+        document.getElementById("user_add_modal").classList.remove("hidden");
+    }
+
+    function closeUserAddModal() {
+        const modal = document.getElementById("user_add_modal");
+        modal.classList.add("hidden");
+        modal.querySelector("form").reset();
+    }
+
+    async function saveUserAddModal() {
+        showLoading();
+
+        const form = document.querySelector("#user_add_modal form");
+        const payload = {
+            name: form.querySelector('[name="name"]').value.trim(),
+            id: form.querySelector('[name="id"]').value.trim(),
+            password: form.querySelector('[name="password"]').value.trim(),
+            status: form.querySelector('[name="status"]').value,
+            roles: Array.from(form.querySelectorAll(".add-role-checkbox:checked")).map(cb => parseInt(cb.value)),
+        };
+
+        try {
+            const resp = await fetch(form.action, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.detail || "등록 실패");
+
+            alert("✅ 사용자 등록이 완료되었습니다.");
+            closeUserAddModal();
+            location.reload();
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            hideLoading();
+        }
+    };
+
+</script>

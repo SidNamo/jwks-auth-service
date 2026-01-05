@@ -1,0 +1,48 @@
+<!-- templates/base.html -->
+ 
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <title>통합 인증 센터</title>
+    <link rel="icon" href="{{ url_for('static', path='image/qupidAi-favicon.ico') }}">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script src="{{ url_for('static', path='js/common.js') }}"></script>
+    
+        
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            if (window.lucide) lucide.createIcons();
+        });
+    </script>
+</head>
+
+<body class="bg-gray-100 min-h-screen overflow-x-hidden">
+
+    <div id="layout" class="flex transition-all duration-300 ease-in-out">
+        <!-- ✅ 좌측 사이드바 -->
+        {% include "nav.html" %}
+
+        <!-- ✅ 우측 콘텐츠 -->
+        <div id="content-wrapper" class="flex flex-col flex-1 transition-all duration-300 ease-in-out">
+            <!-- 상단 헤더 -->
+            <header id="header" class="bg-[#0D0C10] text-gray-200 px-4 py-2 shadow-md z-10">
+                {% include "header.html" %}
+            </header>
+
+            <!-- 본문 -->
+            <main id="main-content" class="p-6 transition-all duration-300 ease-in-out">
+                {% include content_page %}
+            </main>
+        </div>
+    </div>
+
+    {% include "modal.html" %}
+</body>
+
+</html>

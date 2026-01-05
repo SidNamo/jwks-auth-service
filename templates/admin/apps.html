@@ -1,0 +1,823 @@
+<div class="bg-white shadow-md rounded-2xl p-6 relative">
+
+    <!-- ✅ 상단 -->
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">어플리케이션 관리</h2>
+    </div>
+
+    <!-- 🔍 통합 검색 + 상세 검색 -->
+    <div class="mb-4">
+        <form id="search_form" method="get" action="{{ request.base_url }}admin/apps"
+            class="flex flex-col items-end text-sm gap-3">
+
+            <!-- 1) 통합 검색 행 -->
+            <div class="flex items-center justify-between gap-2 relative w-full">
+                <!-- 왼쪽: 어플리케이션 추가 버튼 -->
+                <button type="button"
+                    class="bg-gray-200 text-gray-800 px-3 py-2 rounded text-sm hover:bg-gray-300 border border-gray-300"
+                    onclick="openAppAddModal()">
+                    어플리케이션 추가
+                </button>
+
+                <!-- 오른쪽: 검색창 + 버튼 -->
+                <div class="flex items-center gap-2">
+                    <input type="text" id="search_input" name="query" placeholder="이름, Client ID, UID 검색..."
+                        value="{{ page.search.query or '' }}"
+                        class="border border-gray-300 rounded-lg px-3 py-2 w-80 focus:ring focus:ring-indigo-200"
+                        onfocus="openDetailSearch()">
+
+                    <button type="button" class="bg-indigo-600 text-white px-4 py-2 rounded" onclick="doSearch(1)">
+                        검색
+                    </button>
+                </div>
+
+                <!-- 📦 상세 검색 패널 -->
+                <div id="detail_search_panel"
+                    class="absolute top-12 right-0 w-[30rem] bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 scale-y-0 origin-top transition-all duration-300 ease-out hidden z-40">
+                    <div class="p-5 relative">
+                        <button type="button" onclick="resetDetailSearch()"
+                            class="absolute right-4 top-4 text-sm bg-red-500 hover:bg-red-600 text-white rounded px-3 py-1 shadow-sm transition">
+                            초기화
+                        </button>
+
+                        <h3 class="text-sm font-semibold mb-4 text-gray-700">상세 검색</h3>
+
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <label class="block mb-1 text-gray-600">UID</label>
+                                <input type="text" name="uid" value="{{ page.search.uid or '' }}"
+                                    class="border rounded px-2 py-1 w-full">
+                            </div>
+                            <div>
+                                <label class="block mb-1 text-gray-600">앱 이름</label>
+                                <input type="text" name="name" value="{{ page.search.name or '' }}"
+                                    class="border rounded px-2 py-1 w-full">
+                            </div>
+                            <div>
+                                <label class="block mb-1 text-gray-600">클라이언트 ID</label>
+                                <input type="text" name="client_id" value="{{ page.search.client_id or '' }}"
+                                    class="border rounded px-2 py-1 w-full">
+                            </div>
+                            <div>
+                                <label class="block mb-1 text-gray-600">소유자</label>
+                                <input type="text" name="owner" value="{{ page.search.owner or '' }}"
+                                    placeholder="uid, id, name" class="border rounded px-2 py-1 w-full">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block mb-1 text-gray-600">등록일</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="date" name="created_dt_start"
+                                        value="{{ page.search.created_dt_start or '' }}"
+                                        class="border rounded px-2 py-1 w-full">
+                                    <span>~</span>
+                                    <input type="date" name="created_dt_end"
+                                        value="{{ page.search.created_dt_end or '' }}"
+                                        class="border rounded px-2 py-1 w-full">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ✅ 테이블 -->
+            <table class="w-full border-collapse text-sm mt-4">
+                <thead>
+                    <tr class="bg-gray-100 border-b">
+                        <th class="p-2 text-left">UID</th>
+                        <th class="p-2 text-left">이름</th>
+                        <th class="p-2 text-left">Client ID</th>
+                        <th class="p-2 text-left">등록일</th>
+                        <th class="p-2 text-left">수정일</th>
+                        <th class="p-2 text-center">관리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if page.content %}
+                    {% for app in page.content %}
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="p-2">{{ app.uid }}</td>
+                        <td class="p-2">{{ app.name }}</td>
+                        <td class="p-2 font-mono text-xs text-gray-700">{{ app.client_id }}</td>
+                        <td class="p-2">{{ app.created_at.strftime('%Y-%m-%d %H:%M:%S') if app.created_at else '' }}
+                        </td>
+                        <td class="p-2">{{ app.updated_at.strftime('%Y-%m-%d %H:%M:%S') if app.updated_at else '' }}
+                        </td>
+                        <td class="p-2 text-center space-x-2">
+                            <button type="button" class="text-indigo-600 hover:underline"
+                                onclick="openAppModal({{ app.uid }})">관리</button>
+                            <button type="button" class="text-red-500 hover:underline"
+                                onclick="deleteApp({{ app.uid }})">삭제</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-gray-500 py-6">등록된 어플리케이션이 없습니다.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+
+            <!-- ✅ 페이지네이션 + 표시 개수 -->
+            <div class="w-full mt-6 text-sm flex items-center justify-center relative py-2">
+
+                <!-- ◀️ 페이징 (가운데 정렬) -->
+                <div class="flex justify-center items-center space-x-1">
+                    <button onclick="doPaging(1)"
+                        class="px-3 py-1 border rounded 
+                                    {% if page.page == 1 %}opacity-50 cursor-not-allowed{% else %}hover:bg-gray-100{% endif %}" {% if
+                        page.page==1 %}disabled{% endif %}>
+                        &laquo;
+                    </button>
+
+                    <button onclick="doPaging({{ page.start_page - page.page_size }})"
+                        class="px-3 py-1 border rounded 
+                                    {% if not page.has_prev %}opacity-50 cursor-not-allowed{% else %}hover:bg-gray-100{% endif %}" {% if not page.has_prev %}disabled{% endif %}>
+                        &lsaquo;
+                    </button>
+
+                    {% for p in range(page.start_page, page.end_page + 1) %}
+                    <button onclick="doPaging({{ p }})"
+                        class="px-3 py-1 border rounded 
+                                    {% if p == page.page %}bg-indigo-600 text-white{% else %}hover:bg-gray-100{% endif %}">
+                        {{ p }}
+                    </button>
+                    {% endfor %}
+
+                    <button onclick="doPaging({{ page.start_page + page.page_size }})"
+                        class="px-3 py-1 border rounded 
+                                    {% if not page.has_next %}opacity-50 cursor-not-allowed{% else %}hover:bg-gray-100{% endif %}" {% if not page.has_next %}disabled{% endif %}>
+                        &rsaquo;
+                    </button>
+
+                    <button onclick="doPaging({{ page.page_total }})"
+                        class="px-3 py-1 border rounded 
+                                    {% if page.page == page.page_total %}opacity-50 cursor-not-allowed{% else %}hover:bg-gray-100{% endif %}" {% if
+                        page.page==page.page_total %}disabled{% endif %}>
+                        &raquo;
+                    </button>
+                </div>
+
+                <!-- ▶️ 표시 개수 (같은 flex 라인 오른쪽 끝으로 자동 정렬) -->
+                <div class="flex items-center gap-2 text-gray-700 absolute right-6">
+                    <label>표시:</label>
+                    <select name="list_size"
+                        class="border rounded px-2 py-1 focus:ring focus:ring-indigo-200 focus:border-indigo-400"
+                        onchange="doSearch(1)">
+                        {% for size in [10, 25, 50, 100] %}
+                        <option value="{{ size }}" {% if size==page.list_size %}selected{% endif %}>{{ size }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="text-gray-500">개</span>
+                </div>
+            </div>
+
+            <!-- 유지용 히든 -->
+            <input type="hidden" id="page" name="page" value="{{ page.page }}">
+            <input type="hidden" name="page_size" value="{{ page.page_size }}">
+
+        </form>
+    </div>
+
+    <p class="text-xs text-gray-500 text-center mt-2">
+        총 {{ page.list_total }}개 / {{ page.page_total }}페이지
+    </p>
+</div>
+
+
+<!-- 🧩 앱 관리 모달 -->
+<div id="app_modal" class="modal-layer hidden fixed inset-0 flex items-center justify-center z-[100]">
+    <div class="bg-gray-50 rounded-xl shadow-xl w-[32rem] max-h-[90vh] flex flex-col relative overflow-hidden">
+
+        <!-- ✅ 상단 헤더 -->
+        <div class="flex justify-between items-center p-6 border-b bg-gray-50 rounded-t-xl">
+            <h3 class="text-lg font-bold text-gray-800">어플리케이션 관리</h3>
+            <button onclick="closeAppModal()" class="text-gray-500 hover:text-gray-700 text-xl leading-none">✕</button>
+        </div>
+
+        <!-- ✅ 스크롤 가능한 본문 -->
+        <div class="p-6 overflow-y-auto flex-1 bg-white">
+            <form id="app_form" class="space-y-3 text-sm">
+                <!-- 앱 이름 -->
+                <div>
+                    <label class="block mb-1 text-gray-600">앱 이름</label>
+                    <input name="name" type="text" class="border rounded px-2 py-1 w-full">
+                </div>
+
+                <!-- Client ID -->
+                <div>
+                    <label class="block mb-1 text-gray-600">Client ID</label>
+                    <div class="flex items-center gap-2">
+                        <input name="client_id" type="text" class="border rounded px-2 py-1 w-full">
+                        <button type="button" onclick="generate('CLIENT_ID')"
+                            class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm whitespace-nowrap min-w-[80px] flex-shrink-0">
+                            신규 발급
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Client Secret -->
+                <div>
+                    <label class="block mb-1 text-gray-600">Client Secret</label>
+                    <div class="flex items-center gap-2">
+                        <input name="client_secret" type="text" class="border rounded px-2 py-1 w-full">
+                        <button type="button" onclick="generate('CLIENT_SECRET')"
+                            class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm whitespace-nowrap min-w-[80px] flex-shrink-0">
+                            신규 발급
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 허용 IP -->
+                <div>
+                    <label class="block mb-1 text-gray-600">허용 IP</label>
+                    <textarea name="allowed_ips" rows="4"
+                        class="border rounded px-2 py-1 w-full font-mono text-xs resize-none" placeholder="예시:
+    10.10.100.1
+    10.10.100.22~10.10.100.25
+    192.168.0.0/24
+    2001:db8::/64
+    172.16.0.1/255.255.255.0"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">
+                        IPv4, IPv6, CIDR, Subnet Mask, IP Range(10.0.0.1-10.0.0.10 / 10.0.0.1~10.0.0.10) 모두 지원합니다.
+                    </p>
+                </div>
+
+                <!-- ✅ 소유자 관리 -->
+                <div>
+                    <label class="block mb-1 text-gray-600">소유자</label>
+                    <div class="border rounded-lg p-3 bg-gray-50 text-sm space-y-3">
+                        <!-- 선택된 소유자 목록 -->
+                        <table class="w-full border-collapse text-sm bg-white border">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="p-2 text-center w-20">UID</th>
+                                    <th class="p-2 text-left w-1/3">이름</th>
+                                    <th class="p-2 text-left w-1/3">아이디</th>
+                                    <th class="p-2 text-center w-20">삭제</th>
+                                </tr>
+                            </thead>
+                            <tbody id="owner_table_body">
+                                <tr>
+                                    <td colspan="4" class="text-center text-gray-400 py-2">소유자 없음</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- 검색 입력 -->
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="owner_search" placeholder="UID, ID, 이름으로 검색"
+                                class="border rounded px-2 py-1 flex-1 text-sm">
+                            <button type="button" onclick="searchOwner()"
+                                class="bg-indigo-500 text-white px-3 py-1 rounded text-sm">검색</button>
+                        </div>
+
+                        <!-- 검색 결과 -->
+                        <table class="w-full border-collapse text-sm bg-white border">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="p-2 text-center w-20">UID</th>
+                                    <th class="p-2 text-left w-1/3">이름</th>
+                                    <th class="p-2 text-left w-1/3">아이디</th>
+                                    <th class="p-2 text-center w-20">추가</th>
+                                </tr>
+                            </thead>
+                            <tbody id="owner_result_body">
+                                <tr>
+                                    <td colspan="4" class="text-center text-gray-400 py-2">검색 결과 없음</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 🔑 RSA 키 정보 -->
+                <div>
+                    <!-- 제목 + 버튼을 flex로 정렬 -->
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-gray-700 font-semibold text-sm">RSA Key 정보</h3>
+                        <button type="button" onclick="generate('RSA')"
+                            class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm">
+                            신규 발급
+                        </button>
+                    </div>
+
+                    <!-- ✅ 스크롤 박스 -->
+                    <div id="key_scroll_box"
+                        class="border rounded-lg bg-gray-50 p-3 max-h-80 overflow-y-auto shadow-inner">
+                        <div id="key_list" class="space-y-3">
+                            <div class="text-center text-gray-400 text-sm py-2 border rounded bg-gray-50">
+                                등록된 키 없음
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </form>
+        </div>
+
+        <!-- ✅ 하단 버튼 -->
+        <div class="border-t bg-gray-50 p-4 flex justify-center gap-3 rounded-b-xl">
+            <button type="button" onclick="closeAppModal()"
+                class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">취소</button>
+            <button type="button" onclick="saveAppModal()"
+                class="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white">저장</button>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ JS -->
+<script>
+    let ownerList = [];
+    let appKeys = [];
+
+    function doSearch(page = 1) {
+        const form = document.querySelector("#search_form");
+        const params = new URLSearchParams();
+        form.querySelector("#page").value = page;
+        form.querySelectorAll("input, select").forEach(el => {
+            if (el.name && el.value.trim() !== "") params.append(el.name, el.value);
+        });
+        location.href = form.action + "?" + params.toString();
+    }
+
+    function doPaging(p) {
+        doSearch(p);
+    }
+
+    const panel = document.getElementById("detail_search_panel");
+    const input = document.getElementById("search_input");
+
+    function openDetailSearch() {
+        panel.classList.remove("hidden", "opacity-0", "scale-y-0");
+        setTimeout(() => panel.classList.add("opacity-100", "scale-y-100"), 10);
+    }
+
+    function closeDetailSearch() {
+        panel.classList.remove("opacity-100", "scale-y-100");
+        panel.classList.add("opacity-0", "scale-y-0");
+        setTimeout(() => panel.classList.add("hidden"), 200);
+    }
+
+    function resetDetailSearch() {
+        document.querySelectorAll("#detail_search_panel input").forEach(el => el.value = "");
+    }
+
+    document.addEventListener("click", e => {
+        const opened = !panel.classList.contains("hidden");
+        if (!opened) return;
+        if (!panel.contains(e.target) && e.target !== input) closeDetailSearch();
+    });
+
+
+    /* ✅ openAppModal */
+    async function openAppModal(uid) {
+        showLoading();
+        const modal = document.getElementById("app_modal");
+        const form = document.getElementById("app_form");
+
+        try {
+            const resp = await fetch(`{{ request.base_url }}admin/apps/${uid}`);
+            const app = await resp.json();
+            if (!resp.ok) throw new Error("앱 정보를 불러오지 못했습니다.");
+
+            form.dataset.uid = uid;
+            form.querySelector('[name="name"]').value = app.name || "";
+            form.querySelector('[name="client_id"]').value = app.client_id || "";
+
+            const clientSecret = form.querySelector('[name="client_secret"]');
+            clientSecret.dataset.masking = app.client_secret || "";
+            clientSecret.value = "********";
+
+            form.querySelector('[name="allowed_ips"]').value = (app.allowed_ips || []).join("\n");
+
+            ownerList = app.owners || [];
+            appKeys = app.keys || [];
+
+            renderOwners();
+            renderKeys();
+            setMasking();
+
+            form.dataset.orig = JSON.stringify({
+                name: app.name || "",
+                client_id: app.client_id || "",
+                client_secret: app.client_secret || "",
+                allowed_ips: app.allowed_ips || [],
+                owners: (app.owners || []).map(o => o.uid),
+                keys: app.keys || []
+            });
+            
+            modal.querySelector("h3").textContent = "어플리케이션 관리";
+
+            modal.classList.remove("hidden");
+        } catch (e) {
+            alert(e.message);
+        } finally {
+            hideLoading();
+        }
+    }
+
+    function closeAppModal() {
+
+        const modal = document.getElementById("app_modal");
+        const form = document.getElementById("app_form");
+        modal.classList.add("hidden");
+        form.reset();
+
+        clearMasking(); // 이벤트 제거
+
+        ownerList = [];
+        appKeys = [];
+
+        // ✅ 소유자 관련 테이블 초기화
+        document.getElementById("owner_table_body").innerHTML = `
+            <tr><td colspan="4" class="text-center text-gray-400 py-2">소유자 없음</td></tr>`;
+        document.getElementById("owner_result_body").innerHTML = `
+            <tr><td colspan="4" class="text-center text-gray-400 py-2">검색 결과 없음</td></tr>`;
+
+        // ✅ RSA 키 목록 초기화
+        document.getElementById("key_list").innerHTML = `
+        <div class="text-center text-gray-400 text-sm py-2 border rounded bg-gray-50">
+            등록된 키 없음
+        </div>`;
+    }
+
+    function renderKeys() {
+        const list = document.getElementById("key_list");
+        list.innerHTML = "";
+
+        if (!appKeys || appKeys.length === 0) {
+            list.innerHTML = `
+            <div class="text-center text-gray-400 text-sm py-2 border rounded bg-gray-50">
+                등록된 키 없음
+            </div>`;
+            return;
+        }
+
+        appKeys.forEach((k, idx) => {
+            const div = document.createElement("div");
+            div.className = "border rounded-lg bg-white shadow-sm p-3 space-y-2 text-xs text-gray-700 relative"; // ✅ relative 추가됨
+
+            div.innerHTML = `
+            <!-- ❌ 삭제 버튼 (확실히 우측 상단 고정) -->
+            <button type="button"
+                class="absolute top-2 right-4 text-red-500 hover:text-red-700 text-base font-bold z-10"
+                onclick="removeKey(${idx})">✕</button>
+
+            <div class="grid grid-cols-1 gap-2">
+                <div class="grid grid-cols-1">
+                    <div>
+                        <label class="text-gray-600 text-[11px] font-medium">KID</label>
+                        <input type="text" class="border rounded px-2 py-1 w-full text-xs font-mono"
+                            value="${k.kid || ''}" onchange="appKeys[${idx}].kid = this.value">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-gray-600 text-[11px] font-medium">ALG</label>
+                        <input type="text" class="border rounded px-2 py-1 w-full text-xs"
+                            value="${k.alg || ''}" onchange="appKeys[${idx}].alg = this.value" readonly>
+                    </div>
+                    <div>
+                        <label class="text-gray-600 text-[11px] font-medium">USE</label>
+                        <input type="text" class="border rounded px-2 py-1 w-full text-xs"
+                            value="${k.use || ''}" onchange="appKeys[${idx}].use = this.value" readonly>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-gray-600 text-[11px] font-medium">생성일</label>
+                        <input type="text" class="border rounded px-2 py-1 w-full text-xs"
+                            value="${dateToFormat(k.created_at, 'yyyy.MM.dd HH:mm:ss')}"
+                            onchange="appKeys[${idx}].created_at = this.value">
+                    </div>
+                    <div>
+                        <label class="text-gray-600 text-[11px] font-medium">만료일</label>
+                        <input type="text" class="border rounded px-2 py-1 w-full text-xs"
+                            value="${dateToFormat(k.expired_at, 'yyyy.MM.dd HH:mm:ss')}"
+                            onchange="appKeys[${idx}].expired_at = this.value">
+                    </div>
+                </div>
+
+                <div>
+                    <p class="font-semibold text-gray-600 mb-1">Public Key</p>
+                    <textarea
+                        data-masking="${k.public_key || ''}"
+                        data-key-index="${idx}"
+                        data-field="public_key"
+                        rows="3" 
+                        class="w-full border rounded px-2 py-1 font-mono text-xs">********</textarea>
+                </div>
+
+                <div>
+                    <p class="font-semibold text-gray-600 mb-1">Private Key</p>
+                    <textarea
+                        data-masking="${k.private_key || ''}"
+                        data-key-index="${idx}"
+                        data-field="private_key"
+                        rows="3" 
+                        class="w-full border rounded px-2 py-1 font-mono text-xs">********</textarea>
+                </div>
+            </div>
+        `;
+            list.appendChild(div);
+        });
+    }
+
+    /* ✅ RSA 키 삭제 */
+    function removeKey(index) {
+        appKeys.splice(index, 1);
+        renderKeys();
+    }
+
+    /* ✅ 마스킹 처리 공통 함수 */
+    function setMasking() {
+        const maskTargets = document.querySelectorAll('[data-masking]');
+
+        maskTargets.forEach(el => {
+            // 이벤트 핸들러
+            const onFocus = () => {
+                el.value = el.dataset.masking || "";
+            };
+
+            const onBlur = () => {
+                const newVal = el.value || "";
+                el.dataset.masking = newVal;
+                el.value = "********";
+
+                // ✅ appKeys 배열에도 즉시 반영
+                const idx = el.dataset.keyIndex;
+                const field = el.dataset.field;
+                if (idx !== undefined && field) {
+                    appKeys[idx][field] = newVal;
+                }
+            };
+
+            // 저장
+            el._maskingHandlers = { onFocus, onBlur };
+
+            // 타입별 분기 (input, textarea 등)
+            if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
+                el.addEventListener("focus", onFocus);
+                el.addEventListener("blur", onBlur);
+            }
+        });
+    }
+
+    /* ✅ 마스킹 이벤트 제거 */
+    function clearMasking() {
+        const maskTargets = document.querySelectorAll('[data-masking]');
+        maskTargets.forEach(el => {
+            if (el._maskingHandlers) {
+                el.removeEventListener("focus", el._maskingHandlers.onFocus);
+                el.removeEventListener("blur", el._maskingHandlers.onBlur);
+                delete el._maskingHandlers;
+            }
+        });
+    }
+
+
+    /* ✅ 키/ID/Secret 발급 공통 함수 */
+    async function generate(type) {
+        const url = `{{ request.base_url }}admin/apps/generate?type=${encodeURIComponent(type)}`;
+
+        showLoading();
+        try {
+            const resp = await fetch(url, { method: "GET" });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.detail || data.message || "생성 실패");
+
+            const form = document.getElementById("app_form");
+            if (type === "CLIENT_ID") {
+                form.querySelector('[name="client_id"]').value = data.client_id;
+            } else if (type === "CLIENT_SECRET") {
+                const el = form.querySelector('[name="client_secret"]');
+                el.dataset.masking = data.client_secret;
+                el.value = "********";  // ✅ 덮어쓰기
+            } else if (type === "RSA") {
+                if (!appKeys) appKeys = [];
+                appKeys.unshift(data.key); // ✅ 상단 추가
+                renderKeys();
+                clearMasking();
+                setMasking();
+            }
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            hideLoading();
+        }
+    }
+
+    /* ✅ 소유자 렌더링 (기존 유지) */
+    function renderOwners() {
+        const tbody = document.getElementById("owner_table_body");
+        tbody.innerHTML = "";
+        if (!ownerList || ownerList.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-400 py-2">소유자 없음</td></tr>`;
+            return;
+        }
+        ownerList.forEach(o => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td class="p-2 text-gray-700 text-center">${o.uid}</td>
+                <td class="p-2">${o.name}</td>
+                <td class="p-2">${o.id}</td>
+                <td class="p-2 text-center">
+                    <button type="button" class="text-red-500 text-xs hover:underline" onclick="removeOwner(${o.uid})">삭제</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    /* ✅ 소유자 검색 */
+    async function searchOwner() {
+        showLoading();
+        const keyword = document.getElementById("owner_search").value.trim();
+
+        const resp = await fetch(`{{ request.base_url }}admin/apps/search_user?keyword=${encodeURIComponent(keyword)}`);
+        const results = await resp.json();
+
+        const tbody = document.getElementById("owner_result_body");
+        tbody.innerHTML = "";
+
+        const users = results.data || []; // ✅ data 필드만 사용
+        if (users.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-400 py-2">검색 결과 없음</td></tr>`;
+            hideLoading();
+            return;
+        }
+
+        users.forEach(u => {
+            const exists = ownerList.some(o => o.uid === u.uid);
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td class="p-2 text-center text-gray-700">${u.uid}</td>
+                <td class="p-2">${u.name}</td>
+                <td class="p-2">${u.id}</td>
+                <td class="p-2 text-center">
+                    <button type="button" class="text-indigo-600 text-xs inline-flex items-center justify-center whitespace-nowrap hover:underline"
+                        onclick="addOwner(${u.uid}, '${u.name}', '${u.id}')">추가</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+        hideLoading();
+    }
+
+
+    /* ✅ 소유자 추가 — 테이블에만 반영 */
+    function addOwner(uid, name, id) {
+        if (!ownerList.some(o => o.uid === uid)) {
+            ownerList.push({ uid, name, id });
+            renderOwners();
+        }
+    }
+
+    /* ✅ 소유자 제거 — 테이블에서만 제거 */
+    function removeOwner(uid) {
+        ownerList = ownerList.filter(o => o.uid !== uid);
+        renderOwners();
+    }
+
+    /* ✅ 저장 시 owners 포함하여 PATCH 전송 */
+    async function saveExistingAppModal() {
+        if (!await confirm("정말 이 어플리케이션을 수정하시겠습니까?")) {
+            return; // ❌ 취소한 경우 아무것도 안 함
+        }
+
+        showLoading();
+
+        const form = document.getElementById("app_form");
+        const uid = form.dataset.uid;
+        const orig = JSON.parse(form.dataset.orig || "{}");
+
+        // 현재 입력값 수집
+        const current = {
+            name: form.querySelector('[name="name"]').value.trim(),
+            client_id: form.querySelector('[name="client_id"]').value.trim(),
+            client_secret: form.querySelector('[name="client_secret"]').dataset.masking || "",
+            allowed_ips: form.querySelector('[name="allowed_ips"]').value
+                .split("\n")
+                .map(ip => ip.trim())
+                .filter(ip => ip !== ""),
+            owners: ownerList.map(o => o.uid),
+            keys: appKeys
+        };
+
+        // 변경된 필드만 추출
+        const updated = {};
+        for (const key in current) {
+            const oldVal = JSON.stringify(orig[key]);
+            const newVal = JSON.stringify(current[key]);
+            if (oldVal !== newVal) {
+                updated[key] = current[key];
+            }
+        }
+
+        if (Object.keys(updated).length === 0) {
+            alert("변경된 내용이 없습니다.");
+            hideLoading();
+            return;
+        }
+
+        try {
+            const resp = await fetch(`{{ request.base_url }}admin/apps/${uid}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(updated)
+            });
+
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.detail || data.message || "저장 실패");
+
+            alert("✅ 어플리케이션 정보가 수정되었습니다.");
+            closeAppModal();
+            location.reload();
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            hideLoading();
+        }
+    }
+    
+    /* ✅ 신규 생성 모달 열기 */
+    function openAppAddModal() {
+        const modal = document.getElementById("app_modal");
+        const form = document.getElementById("app_form");
+
+        // 폼 초기화
+        form.reset();
+        delete form.dataset.uid;
+        delete form.dataset.orig;
+
+        ownerList = [];
+        appKeys = [];
+
+        // 렌더링 초기화
+        renderOwners();
+        renderKeys();
+        clearMasking();
+
+        // 기본값
+        form.querySelector('[name="client_id"]').value = "";
+        form.querySelector('[name="client_secret"]').value = "";
+        form.querySelector('[name="allowed_ips"]').value = "";
+
+        modal.querySelector("h3").textContent = "어플리케이션 추가";
+
+        modal.classList.remove("hidden");
+    }
+
+    /* ✅ 신규 생성 저장 */
+    async function saveAppAddModal() {
+        if (!await confirm("새로운 어플리케이션을 추가하시겠습니까?")) return;
+
+        showLoading();
+        const form = document.getElementById("app_form");
+
+        const payload = {
+            name: form.querySelector('[name="name"]').value.trim(),
+            client_id: form.querySelector('[name="client_id"]').value.trim(),
+            client_secret: form.querySelector('[name="client_secret"]').dataset.masking || "",
+            allowed_ips: form.querySelector('[name="allowed_ips"]').value
+                .split("\n").map(ip => ip.trim()).filter(ip => ip !== ""),
+            owners: ownerList.map(o => o.uid),
+            keys: appKeys
+        };
+
+        try {
+            const resp = await fetch(`{{ request.base_url }}admin/apps`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.detail || data.message || "추가 실패");
+
+            alert("✅ 어플리케이션이 추가되었습니다.");
+            closeAppModal();
+            location.reload();
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            hideLoading();
+        }
+    }
+
+    /* ✅ 저장 버튼 수정 */
+    function saveAppModal() {
+        const form = document.getElementById("app_form");
+        if (form.dataset.uid) {
+            // 수정
+            saveExistingAppModal();
+        } else {
+            // 생성
+            saveAppAddModal();
+        }
+    }
+</script>

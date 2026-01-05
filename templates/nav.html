@@ -1,0 +1,233 @@
+{% set menus = request.state.menus %}
+{% set user = request.state.user %}
+{% set current_path = request.state.current_path %}
+
+<!-- ✅ 사이드바 -->
+<div id="sidebar"
+    class="flex flex-col h-screen bg-[#0F0F10] text-gray-200 shadow-2xl z-40 transition-all duration-300 ease-in-out w-16 overflow-visible relative">
+
+    <!-- ✅ 상단: 로고 + 토글 -->
+    <div class="border-b border-gray-800 h-12 relative">
+        <!-- ✅ 로고 -->
+        <div
+            class="absolute left-0 top-0 h-full w-12 bg-[#0F0F10] flex items-center justify-center z-20 transition-all duration-300 rounded-tr-lg rounded-br-lg shadow-lg">
+            <a id="sidebar-logo" href="/"
+                class="flex items-center justify-center w-10 h-10 text-white relative cursor-pointer select-none transition-all duration-300">
+                <img src="{{ url_for('static', path='image/qupidAi-favicon.ico') }}" alt="logo"
+                    class="w-6 h-6 absolute logo-icon">
+                <i data-lucide="panel-right" class="w-6 h-6 absolute menu-icon hidden"></i>
+            </a>
+        </div>
+
+        <!-- ✅ 토글 버튼 (fade) -->
+        <button id="collapse-toggle"
+            class="absolute right-2 top-1/2 -translate-y-1/2 z-10 text-gray-300 hover:text-white transition-all duration-500 w-6 h-6 flex items-center justify-center opacity-100"
+            type="button">
+            <i data-lucide="panel-left" class="w-5 h-5"></i>
+        </button>
+    </div>
+
+    <!-- ✅ 메뉴 -->
+    <ul class="mt-2 space-y-1 text-sm flex-1 overflow-hidden">
+        {% macro render_menu(items, level=1) %}
+        {% for m in items %}
+        {% set active = (m.url and current_path.startswith(m.url)) %}
+        {% set has_active_child = m.children and (m.children | selectattr('url', 'defined') |
+        selectattr('url','equalto', current_path) | list | length > 0 or
+        (m.children | selectattr('url','defined') | selectattr('url', 'in', current_path) | list | length > 0)) %}
+        <li>
+            {% if m.children %}
+            <div class="flex items-center justify-between w-full px-2.5 py-2 rounded-md hover:bg-gray-800 transition">
+                <button type="button" class="flex items-center gap-2.5 flex-grow text-left"
+                    onclick="toggleSubmenu(this)">
+                    <i data-lucide="{{ m.icon or 'folder' }}"
+                        class="w-5 h-5 {% if active or has_active_child %}text-purple-400{% else %}text-gray-400{% endif %}"></i>
+                    <span class="menu-text {% if active or has_active_child %}text-purple-400 font-semibold{% endif %}">
+                        {{ m.name }}
+                    </span>
+                </button>
+                <svg xmlns="http://www.w3.org/2000/svg"
+                    class="submenu-toggle w-4 h-4 text-gray-400 transition-transform duration-300 cursor-pointer"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" onclick="toggleSubmenu(this)">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+
+            <ul class="submenu ml-8 max-h-0 overflow-hidden transition-all duration-300 ease-in-out"
+                data-open="{% if has_active_child or active %}true{% else %}false{% endif %}">
+                {{ render_menu(m.children, level + 1) }}
+            </ul>
+            {% else %}
+            <a href="{{ request.base_url }}{{ (m.url or '#') | replace('/', '', 1) }}"
+                class="flex items-center gap-2.5 px-2.5 py-2 rounded-md transition
+                      {% if active %}text-purple-400 font-semibold{% else %}text-gray-300 hover:bg-purple-800/30 hover:text-white{% endif %}">
+                <i data-lucide="{{ m.icon or 'circle' }}"
+                    class="w-5 h-5 {% if active %}text-purple-400{% else %}text-gray-400{% endif %}"></i>
+                <span class="menu-text">{{ m.name }}</span>
+            </a>
+            {% endif %}
+        </li>
+        {% endfor %}
+        {% endmacro %}
+        {{ render_menu(menus) }}
+    </ul>
+</div>
+
+<!-- ✅ 스타일 -->
+<style>
+    #sidebar {
+        flex-shrink: 0;
+        transition: width 0.3s ease-in-out;
+    }
+
+    #sidebar.expanded {
+        width: 16rem;
+    }
+
+    #sidebar:not(.expanded) {
+        width: 2.5rem;
+    }
+
+    #sidebar .menu-text {
+        opacity: 1;
+        transition: opacity 0.2s ease-in-out;
+        white-space: nowrap;
+    }
+
+    #sidebar:not(.expanded) .menu-text {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .submenu.open {
+        max-height: 500px;
+    }
+
+    #sidebar ul {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    /* ✅ hover 시 로고/아이콘 전환 */
+    #sidebar.collapsed:hover #sidebar-logo .logo-icon {
+        display: none;
+    }
+
+    #sidebar.collapsed:hover #sidebar-logo .menu-icon {
+        display: block;
+    }
+
+    #sidebar-logo i,
+    #sidebar-logo img {
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        position: absolute;
+    }
+
+    #sidebar.collapsed #collapse-toggle {
+        display: none;
+    }
+</style>
+
+<!-- ✅ 스크립트 -->
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const sidebar = document.getElementById("sidebar");
+        const logoLink = document.getElementById("sidebar-logo");
+        const toggleBtn = document.getElementById("collapse-toggle");
+
+        let isExpanded = false;
+        let transitionHandlerBound = false;
+
+        function applyState({ immediate = false } = {}) {
+            const submenus = sidebar.querySelectorAll(".submenu");
+
+            sidebar.classList.add("is-transitioning");
+
+            if (isExpanded) {
+                // ▶ 펼치기
+                sidebar.classList.remove("collapsed");
+                sidebar.classList.add("expanded");
+
+                // 토글 버튼 fade-in
+                toggleBtn.classList.remove("opacity-0", "pointer-events-none");
+                toggleBtn.classList.add("opacity-100");
+
+                // ✅ data-open=true인 submenu 다시 열기
+                submenus.forEach(sm => {
+                    const shouldOpen = sm.dataset.open === "true";
+                    sm.classList.toggle("open", shouldOpen);
+                });
+
+            } else {
+                // ◀ 접히기
+                sidebar.classList.remove("expanded");
+                sidebar.classList.remove("collapsed");
+
+                // 버튼 fade-out
+                toggleBtn.classList.add("opacity-0", "pointer-events-none");
+                toggleBtn.classList.remove("opacity-100");
+
+                // ✅ submenu 닫기 (data-open은 유지)
+                submenus.forEach(sm => {
+                    sm.classList.remove("open");
+                });
+
+                if (immediate) {
+                    sidebar.classList.add("collapsed");
+                } else {
+                    const onEnd = (e) => {
+                        if (e.target !== sidebar) return;
+                        if (e.propertyName && !String(e.propertyName).includes("width")) return;
+                        sidebar.removeEventListener("transitionend", onEnd);
+                        transitionHandlerBound = false;
+                        sidebar.classList.remove("is-transitioning");
+                        sidebar.classList.add("collapsed");
+                    };
+                    if (!transitionHandlerBound) {
+                        sidebar.addEventListener("transitionend", onEnd);
+                        transitionHandlerBound = true;
+                    }
+                }
+            }
+
+            toggleBtn.innerHTML = isExpanded
+                ? `<i data-lucide='panel-left' class='w-5 h-5'></i>`
+                : `<i data-lucide='panel-right' class='w-5 h-5'></i>`;
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // ✅ 로고 클릭
+        logoLink.addEventListener("click", (e) => {
+            if (!isExpanded) {
+                e.preventDefault();
+                isExpanded = true;
+                applyState();
+            } else {
+                window.location.href = "/";
+            }
+        });
+
+        // ✅ 토글 클릭
+        toggleBtn.addEventListener("click", () => {
+            isExpanded = !isExpanded;
+            applyState();
+        });
+
+        // ✅ 서브메뉴 토글 (상태 기록)
+        window.toggleSubmenu = (el) => {
+            if (!sidebar.classList.contains("expanded")) return;
+            const parent = el.closest("div");
+            const submenu = parent.nextElementSibling;
+            const icon = parent.querySelector(".submenu-toggle");
+            const isOpen = submenu.dataset.open === "true";
+            submenu.dataset.open = isOpen ? "false" : "true"; // ← 상태 기록 유지
+            submenu.classList.toggle("open", !isOpen);
+            if (icon) icon.style.transform = !isOpen ? "rotate(180deg)" : "rotate(0deg)";
+        };
+
+        applyState({ immediate: true });
+    });
+</script>
